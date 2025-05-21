@@ -1,4 +1,3 @@
 requests
-csv
 pydrive2
 oauth2client
