@@ -2,6 +2,7 @@ import os
 import json
 import requests
 import csv
+import time
 from datetime import datetime
 from pydrive2.auth import GoogleAuth
 from pydrive2.drive import GoogleDrive
@@ -10,11 +11,10 @@ from oauth2client.service_account import ServiceAccountCredentials
 # Load Google Drive credentials from Railway environment variable
 creds_json = os.getenv("GDRIVE_CREDENTIALS")
 if creds_json:
-    creds_path = "/tmp/credentials.json"  # Temp file path
+    creds_path = "/tmp/credentials.json"
     with open(creds_path, "w") as f:
         f.write(creds_json)
 
-    # Authenticate with Google Drive using service account
     scope = ["https://www.googleapis.com/auth/drive"]
     creds = ServiceAccountCredentials.from_json_keyfile_name(creds_path, scope)
     gauth = GoogleAuth()
@@ -23,13 +23,13 @@ if creds_json:
 else:
     print("❌ Google Drive credentials not found!")
 
-# Hard-coded API URL
+# Constants
 URL = "https://imgametransit.com/api/webapi/GetNoaverageEmerdList"
 HEADERS = {"Content-Type": "application/json"}
 CSV_FILE = "data.csv"
 CSV_HEADERS = ["Period", "Number", "Premium"]
+MAX_ENTRIES = 8000  # data rows only (excluding header)
 
-# Fetch data
 def fetch_data():
     payload = {
         "pageSize": 10,
@@ -46,14 +46,12 @@ def fetch_data():
         return data["data"]["list"] if "data" in data and "list" in data["data"] else None
     return None
 
-# Check existing periods
 def get_existing_periods():
     if not os.path.exists(CSV_FILE):
         return set()
     with open(CSV_FILE, "r") as file:
         return {line.split(",")[0] for line in file.readlines()[1:]}
 
-# Write to CSV and upload to Google Drive
 def write_to_csv(items):
     existing_periods = get_existing_periods()
     new_data = []
@@ -65,17 +63,35 @@ def write_to_csv(items):
         if period not in existing_periods:
             new_data.append([period, number, premium])
             print(f"✅ New period added: {period}")
+        else:
+            print(f"⚠️ Duplicate period skipped: {period}")
 
-    if new_data:
-        with open(CSV_FILE, "w", newline="") as file:
-            writer = csv.writer(file)
-            writer.writerow(CSV_HEADERS)
-            writer.writerows(new_data)
+    if not new_data:
+        return
 
-        # Upload to Google Drive
-        upload_to_drive()
+    # Read existing data (excluding header)
+    existing_data = []
+    if os.path.exists(CSV_FILE):
+        with open(CSV_FILE, "r") as file:
+            lines = file.readlines()
+            existing_data = [line.strip().split(",") for line in lines[1:]]
 
-# Upload function
+    # Prepend new data on top of existing
+    combined_data = new_data + existing_data
+
+    # Trim to MAX_ENTRIES if needed
+    if len(combined_data) > MAX_ENTRIES:
+        print("🧹 Trimming CSV to latest 8000 rows.")
+        combined_data = combined_data[:MAX_ENTRIES]
+
+    # Write to file (header + combined)
+    with open(CSV_FILE, "w", newline="") as file:
+        writer = csv.writer(file)
+        writer.writerow(CSV_HEADERS)
+        writer.writerows(combined_data)
+
+    upload_to_drive()
+
 def upload_to_drive():
     file_list = drive.ListFile({'q': f"title='{CSV_FILE}' and trashed=false"}).GetList()
     if file_list:
@@ -87,14 +103,18 @@ def upload_to_drive():
     file.Upload()
     print(f"📤 Uploaded {CSV_FILE} to Google Drive!")
 
-# Main function
-def main():
-    print("Fetching data...")
-    data = fetch_data()
-    if data:
-        write_to_csv(data)
-    else:
-        print("No new data found.")
+def main_loop():
+    while True:
+        print(f"\n⏰ Running fetch at {datetime.now()}")
+        try:
+            data = fetch_data()
+            if data:
+                write_to_csv(data)
+            else:
+                print("⚠️ No new data found.")
+        except Exception as e:
+            print(f"❌ Error occurred: {e}")
+        time.sleep(9 * 60)
 
 if __name__ == "__main__":
-    main()
+    main_loop()
