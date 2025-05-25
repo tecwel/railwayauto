@@ -17,11 +17,10 @@ if creds_json:
 
     scope = ["https://www.googleapis.com/auth/drive"]
     creds = ServiceAccountCredentials.from_json_keyfile_name(creds_path, scope)
-    gauth = GoogleAuth()
-    gauth.credentials = creds
-    drive = GoogleDrive(gauth)
+    drive = GoogleDrive(creds)  # ✅ Directly use service account credentials
 else:
     print("❌ Google Drive credentials not found!")
+
 
 # Constants
 URL = "https://imgametransit.com/api/webapi/GetNoaverageEmerdList"
