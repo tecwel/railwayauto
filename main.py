@@ -8,8 +8,14 @@ from pydrive2.auth import GoogleAuth
 from pydrive2.drive import GoogleDrive
 from oauth2client.service_account import ServiceAccountCredentials
 
+from pydrive2.auth import GoogleAuth
+from pydrive2.drive import GoogleDrive
+from oauth2client.service_account import ServiceAccountCredentials
+
 # Load Google Drive credentials from Railway environment variable
 creds_json = os.getenv("GDRIVE_CREDENTIALS")
+drive = None
+
 if creds_json:
     creds_path = "/tmp/credentials.json"
     with open(creds_path, "w") as f:
@@ -17,9 +23,13 @@ if creds_json:
 
     scope = ["https://www.googleapis.com/auth/drive"]
     creds = ServiceAccountCredentials.from_json_keyfile_name(creds_path, scope)
-    drive = GoogleDrive(creds)  # ✅ Directly use service account credentials
+
+    gauth = GoogleAuth()
+    gauth.credentials = creds  # ✅ This avoids looking for client_secrets.json
+    drive = GoogleDrive(gauth)
 else:
     print("❌ Google Drive credentials not found!")
+
 
 
 # Constants
