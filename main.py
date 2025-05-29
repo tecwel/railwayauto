@@ -24,11 +24,18 @@ if creds_json:
     scope = ["https://www.googleapis.com/auth/drive"]
     creds = ServiceAccountCredentials.from_json_keyfile_name(creds_path, scope)
 
-    gauth = GoogleAuth()
-    gauth.credentials = creds  # ✅ This avoids looking for client_secrets.json
+    # ✅ Explicitly configure GoogleAuth to skip client_secrets.json
+    gauth = GoogleAuth(settings={
+        "client_config_backend": "service",
+        "service_config": {
+            "client_json_file_path": creds_path
+        }
+    })
+    gauth.credentials = creds
     drive = GoogleDrive(gauth)
 else:
     print("❌ Google Drive credentials not found!")
+
 
 
 
