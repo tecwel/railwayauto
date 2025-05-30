@@ -105,6 +105,19 @@ def write_to_csv(items):
             writer.writerow(CSV_HEADERS)  # Always keep header
             writer.writerows(new_data)  # Write new data first
             writer.writerows(existing_data[1:])  # Append old data (skip duplicate header)
+            
+        # ✅ Limit CSV to 5000 entries (excluding header)
+        with open(CSV_FILE, "r", newline="") as file:
+            reader = list(csv.reader(file))
+
+        if len(reader) > 5001:  # 1 header + 5000 rows
+            print("🧹 CSV limit reached. Cleaning up old entries...")
+            # Keep header and the latest 5000 rows
+            reader = [reader[0]] + reader[1:5001]
+            with open(CSV_FILE, "w", newline="") as file:
+                writer = csv.writer(file)
+                writer.writerows(reader)
+
 
         # ✅ Upload to Google Drive if new data is added
         upload_to_drive()
